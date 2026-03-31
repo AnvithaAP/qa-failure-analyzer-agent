@@ -1,61 +1,192 @@
 # QA Failure Analyzer Agent
 
-A production-aware Python system that transforms QA logs into structured failure analysis with explicit role separation, evaluation introspection, prompt experimentation, and reproducible execution.
+A production-aware Python system that turns noisy QA failure logs into structured, triage-ready analysis.
 
-## Structured Output
+It combines **LLM reasoning** with **deterministic rule checks** so teams get both flexibility and consistency when classifying failures.
 
-```json
-{
-  "root_cause": "...",
-  "category": "Product Bug | Test Issue | Environment Issue",
-  "confidence": 0.0,
-  "confidence_reason": "High confidence due to clear timeout pattern",
-  "suggestion": "...",
-  "latency": 0.0,
-  "prompt_version": "v1"
-}
-```
+---
+
+## Why This Matters
+
+Traditional failure analysis in QA pipelines is often inefficient:
+
+- Engineers manually scan long logs to find the likely root cause.
+- Triage outcomes vary by person, context, and urgency.
+- Repeated failure patterns are rediscovered instead of standardized.
+
+This agent improves workflow quality by making failure analysis:
+
+- **Faster**: automated first-pass classification reduces triage time.
+- **More consistent**: normalized JSON output enforces a stable schema.
+- **More scalable**: the same pipeline can run on one log or many logs from CI.
+
+In practice: **manual analysis → slow and inconsistent**, while an **AI-assisted analyzer → faster, more standardized, and easier to operationalize**.
+
+---
+
+## 🔄 Before vs After
+
+### Without Agent
+
+- Manual log reading for each failure.
+- High triage time and high context-switch cost.
+- Inconsistent category labeling.
+- Harder automation for Jira/Slack/reporting because output shape varies.
+
+### With Agent
+
+- Automated log cleaning, signal extraction, and classification.
+- Faster debugging through structured root cause + suggestion fields.
+- Standardized categories and confidence fields.
+- Machine-readable JSON output ready for pipeline integrations.
+
+---
 
 ## 🏗️ Where This Fits in QA Systems
 
-This agent is designed to be a composable component in a broader QA platform:
+This agent is designed as a composable component in a larger QA platform:
 
-- **CI/CD pipelines**: run after test jobs fail, classify failures, and produce machine-readable artifacts.
-- **Test execution workflows**: consume Playwright/Cypress/JUnit/raw logs and normalize them into triage-ready output.
-- **Failure triage systems**: route incidents to Jira/Slack/reporting dashboards with category + confidence metadata.
+- **CI/CD pipelines**: run after test failures to classify incidents.
+- **Test execution workflows**: process Playwright/Cypress/JUnit/raw logs.
+- **Failure triage systems**: route incidents to Jira/Slack/dashboards.
 
-Example integration flow:
+**Integration flow:**
 
 `Test Runner → Logs → Failure Analyzer → Jira / Reporting`
 
+---
+
 ## System Roles
 
-- **Analyzer (LLM)**: interprets logs with strict JSON output using versioned prompts in `prompts/`.
-- **Classifier (rules)**: applies deterministic overrides for known failure signatures.
-- **Evaluator**: reports quality metrics, per-error reasoning, hardest cases, and baseline comparisons.
+- **Analyzer (LLM)**: interprets logs using versioned prompts in `prompts/` and returns strict JSON.
+- **Classifier (rules)**: applies deterministic keyword-based overrides for known failure signatures.
+- **Evaluator**: reports quality metrics, hardest cases, and baseline comparisons.
 
-This separation improves extensibility and makes behavior easier to tune and audit.
+This separation keeps the system easier to audit, tune, and evolve.
+
+---
+
+## ⚖️ Design Decisions & Tradeoffs
+
+### Why hybrid (LLM + rules)
+
+A hybrid approach captures semantic context (LLM) while preserving deterministic behavior for known patterns (rules).
+
+### Why not rule-only
+
+Rule-only systems are fast and cheap, but brittle. They miss nuanced failures and degrade when logs vary in wording or structure.
+
+### Why JSON output
+
+Structured JSON enables downstream automation (dashboards, alerts, ticketing, and analytics) without fragile parsing.
+
+### Accuracy vs cost tradeoff
+
+Higher reasoning depth can improve classification quality, but increases token usage and latency. This project explicitly surfaces `confidence`, `token_estimate`, and `cost_estimate_usd` so teams can tune for their SLA and budget.
+
+---
 
 ## Pipeline
+
+`Input → Cleaning → LLM → Classification → Validation → Output`
+
+Implemented flow:
 
 `clean_log -> detect_error_events -> prioritize_critical_error -> (optional summarize) -> analyzer -> classifier -> validate_output -> memory`
 
 Includes:
+
 - multi-line log support (stack traces and continuation lines)
-- multiple error detection in one log with severity-based prioritization
+- multiple error detection in one log with severity prioritization
 - truncated/partial log handling with confidence penalties
 - confidence-based retry with stronger prompt behavior
 - hybrid rule-based classification override
 - validation guardrails and standardized latency field
-- prompt version tracking (`prompt_version` in every output)
+- prompt version tracking (`prompt_version` in each output)
 - caching + JSON memory for similar logs
 - batch processing mode for real-world multi-log runs
 
+---
+
+## 📊 What the Metrics Mean
+
+### Accuracy
+
+How often predicted categories match expected labels in the evaluation dataset.
+
+### Confidence
+
+Model-reported certainty (post-processed by rule signals and quality checks). Higher confidence suggests clearer evidence, not guaranteed correctness.
+
+### When confidence is less reliable
+
+Confidence should be treated cautiously when logs are truncated, partial, ambiguous, or contain overlapping failures. In those cases, confidence can be directionally useful but not definitive.
+
+---
+
+## ⚠️ When This May Fail
+
+- Ambiguous logs without clear causal signals.
+- Multiple overlapping errors where one symptom hides another root issue.
+- LLM hallucinations or schema-compliant but incorrect reasoning.
+- Small evaluation dataset size limiting confidence in generalization.
+
+Use this tool as a triage accelerator, with human review for high-impact incidents.
+
+---
+
+## ▶️ Quick Demo
+
+Run:
+
+```bash
+python src/agent.py --log "TimeoutError: API did not respond"
+```
+
+Example output:
+
+```json
+{
+  "root_cause": "External API did not respond within expected timeout window.",
+  "category": "Environment Issue",
+  "confidence": 0.86,
+  "confidence_reason": "Confidence combines keyword match, LLM certainty, and rule overrides; strongest signal='timeout' (severity=80).",
+  "suggestion": "Verify network health, API availability, and retry policy configuration.",
+  "latency": 0.123,
+  "prompt_version": "v1",
+  "token_estimate": 420,
+  "cost_estimate_usd": 0.00021
+}
+```
+
+---
+
+## CLI Usage
+
+```bash
+python src/agent.py --log "TimeoutError: API did not respond"
+python src/agent.py --file examples/logs/timeout.txt
+python src/agent.py --folder examples/logs/
+python src/agent.py --ci-mode examples/sample_logs.txt
+python src/agent.py --file examples/logs/assertion.txt --prompt v2 --debug
+```
+
+### CI Mode
+
+`--ci-mode` ingests a single stream with multiple failures (separated by `---`, `===`, or blank blocks), then:
+
+- processes each failure block
+- emits per-log structured results
+- prints aggregate summary (category counts, average confidence/latency)
+- reports **Avg Cost per log** and **Total Cost**
+
+---
+
 ## Configurable Categories
 
-Categories are now loaded from `src/categories.json`.
+Categories are loaded from `src/categories.json`.
 
-You can add new categories without changing Python logic:
+Example:
 
 ```json
 {
@@ -67,6 +198,35 @@ You can add new categories without changing Python logic:
   ]
 }
 ```
+
+---
+
+## 📈 Evaluation Metrics
+
+Run:
+
+```bash
+python evaluate.py
+```
+
+The evaluation output includes:
+
+- rule-only baseline accuracy vs hybrid-agent accuracy
+- overall and per-category accuracy
+- precision/recall per category
+- average confidence, latency, and cost
+- misclassification introspection and hardest cases
+
+---
+
+## 🚀 Future Work
+
+- Integration with CI/CD and incident-management tools.
+- Larger and more diverse dataset evaluation.
+- Fine-tuned models for domain-specific failure signatures.
+- Real-time monitoring and trend analytics over repeated failures.
+
+---
 
 ## Project Structure
 
@@ -89,65 +249,3 @@ qa-failure-analyzer-agent/
 ├── requirements.txt
 └── evaluate.py
 ```
-
-### ▶️ Quick Start
-
-```bash
-pip install -r requirements.txt
-python src/agent.py --log "TimeoutError: API did not respond"
-```
-
-## CLI Usage
-
-```bash
-python src/agent.py --log "TimeoutError: API did not respond"
-python src/agent.py --file examples/logs/timeout.txt
-python src/agent.py --folder examples/logs/
-python src/agent.py --ci-mode examples/sample_logs.txt
-python src/agent.py --file examples/logs/assertion.txt --prompt v2 --debug
-```
-
-### CI Mode
-
-`--ci-mode` ingests a single log stream file containing multiple failures (separated by `---`, `===`, or blank blocks), then:
-
-- processes each failure block
-- emits per-log structured results
-- prints aggregate summary (category counts, average confidence/latency)
-- reports **Avg Cost per log** and **Total Cost**
-
-## Confidence & Cost Signals
-
-Each analysis carries explicit confidence rationale:
-
-- **Keyword match** (rule evidence strength)
-- **LLM certainty** (model confidence output)
-- **Rule overrides** (deterministic correction boosts)
-
-Performance/cost awareness includes:
-
-- approximate token usage (`token_estimate`)
-- per-log cost estimate (`cost_estimate_usd`)
-- run-level average/total cost in batch and evaluation runs
-
-## 📊 Evaluation Metrics
-
-Run:
-
-```bash
-python evaluate.py
-```
-
-The evaluation output includes:
-- rule-only baseline accuracy vs LLM-agent accuracy improvement
-- overall and per-category accuracy
-- precision/recall per category
-- average confidence, latency, and cost
-- misclassification introspection
-- top failure patterns + hardest cases
-
-## ⚠️ Limitations
-
-- LLM behavior can still drift despite strict formatting constraints.
-- Cost estimation is approximate and model-price dependent.
-- The included dataset is intentionally small and should be expanded for production confidence.
