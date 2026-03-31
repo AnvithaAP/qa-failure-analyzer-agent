@@ -1,0 +1,3 @@
+2026-03-30 09:10:00 INFO Running checkout API test
+2026-03-30 09:10:10 ERROR TimeoutError: API did not respond within 10s
+2026-03-30 09:10:10 ERROR Request ID: req-145

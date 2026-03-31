@@ -3,64 +3,83 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 from pathlib import Path
 from typing import Any
 
-from classifier import apply_rule_override, postprocess_analysis
+from classifier import classify_failure, validate_output
 from llm import analyze_log
-from utils import clean_log_text, truncate_log
+from utils import clean_log
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("qa_failure_analyzer")
+
+_CONFIDENCE_WARNING_THRESHOLD = 0.6
+_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def _cache_key(log_text: str) -> str:
+    return hashlib.sha256(log_text.encode("utf-8")).hexdigest()
 
 
 def run_analysis(log_text: str) -> dict[str, Any]:
-    """Run the full pipeline: clean -> truncate -> LLM -> classify -> normalize."""
+    """Pipeline: clean -> analyze -> classify -> validate -> output."""
     if not log_text or not log_text.strip():
-        raise ValueError("Log text is empty. Provide --log or --log-file with content.")
+        raise ValueError("Log text is empty. Provide --log or --file with content.")
 
-    logger.info("[Step 1] Cleaning logs...")
-    cleaned = clean_log_text(log_text)
+    logger.info("[INFO] Cleaning logs")
+    cleaned_log = clean_log(log_text)
 
-    logger.info("[Step 2] Truncating logs for model context...")
-    prepared = truncate_log(cleaned)
+    key = _cache_key(cleaned_log)
+    if key in _CACHE:
+        logger.info("[INFO] Using cached response")
+        return _CACHE[key]
 
-    logger.info("[Step 3] Sending logs to LLM...")
-    raw_output = analyze_log(prepared)
+    llm_result = analyze_log(cleaned_log, retries=1)
 
-    logger.info("[Step 4] Applying deterministic classifier override...")
-    hybrid_output = apply_rule_override(raw_output, prepared)
+    logger.info("[INFO] Classifying failure")
+    classified = classify_failure(llm_result, cleaned_log)
 
-    logger.info("[Step 5] Normalizing final JSON payload...")
-    return postprocess_analysis(hybrid_output)
+    logger.info("[INFO] Validation complete")
+    validated = validate_output(classified)
+
+    if validated["confidence"] < _CONFIDENCE_WARNING_THRESHOLD:
+        logger.warning(
+            "[WARN] Low-confidence analysis (%.2f). Consider manual review.", validated["confidence"]
+        )
+
+    _CACHE[key] = validated
+    return validated
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Analyze QA failures from logs using an LLM.")
+    parser = argparse.ArgumentParser(description="Analyze QA failures from logs using an AI agent pipeline.")
     parser.add_argument("--log", type=str, help="Inline log text to analyze.")
-    parser.add_argument("--log-file", type=Path, help="Path to a log file to analyze.")
+    parser.add_argument("--file", type=Path, help="Path to a log file to analyze.")
+    parser.add_argument("--log-file", type=Path, help="Deprecated alias for --file.")
     return parser.parse_args()
 
 
 def _get_input_text(args: argparse.Namespace) -> str:
     if args.log:
         return args.log
-    if args.log_file:
-        return args.log_file.read_text(encoding="utf-8")
-    raise ValueError("Provide input via --log or --log-file.")
+
+    file_path = args.file or args.log_file
+    if file_path:
+        return file_path.read_text(encoding="utf-8")
+
+    raise ValueError("Provide input via --log or --file.")
 
 
 def main() -> None:
     args = _parse_args()
-
     try:
-        input_text = _get_input_text(args)
-        result = run_analysis(input_text)
+        result = run_analysis(_get_input_text(args))
         print(json.dumps(result, indent=2))
-    except Exception as exc:  # noqa: BLE001 - user-facing CLI boundary
-        logger.error("Analysis failed: %s", exc)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("[ERROR] Analysis failed: %s", exc)
         raise SystemExit(1) from exc
 
 

@@ -1,42 +1,51 @@
-"""Evaluate rule-based classifier performance on sample QA failure logs."""
+"""Run end-to-end evaluation against sample QA logs."""
 
 from __future__ import annotations
 
-import json
+import sys
 from pathlib import Path
 
-from src.classifier import infer_category_from_rules
-from src.utils import clean_log_text
+ROOT = Path(__file__).resolve().parent
+SRC_PATH = ROOT / "src"
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
 
-DATASET_PATH = Path("examples/eval_dataset.json")
+from agent import run_analysis
+from src.evaluator import evaluate
+
+LOG_DIR = Path("examples/logs")
+
+EXPECTED = {
+    "timeout.txt": "Environment Issue",
+    "assertion.txt": "Test Issue",
+    "locator.txt": "Test Issue",
+    "api_error.txt": "Product Bug",
+    "db_failure.txt": "Environment Issue",
+}
 
 
 def main() -> None:
-    dataset = json.loads(DATASET_PATH.read_text(encoding="utf-8"))
+    predictions: list[dict[str, object]] = []
+    ground_truth: list[dict[str, object]] = []
 
-    total = len(dataset)
-    correct = 0
+    for filename, expected_category in EXPECTED.items():
+        log_path = LOG_DIR / filename
+        log_text = log_path.read_text(encoding="utf-8")
+        result = run_analysis(log_text)
+        predictions.append(result)
+        ground_truth.append({"category": expected_category})
 
-    print("[Step 1] Loading evaluation dataset...")
-    print(f"Loaded {total} labeled examples from {DATASET_PATH}.")
+        print(
+            f"- {filename}: predicted={result['category']} "
+            f"expected={expected_category} confidence={result['confidence']:.2f}"
+        )
 
-    print("[Step 2] Running rule-based classification...")
-    for item in dataset:
-        log_path = Path(item["file"])
-        expected = item["category"]
-        log_text = clean_log_text(log_path.read_text(encoding="utf-8"))
-        predicted = infer_category_from_rules(log_text) or "Test Issue"
-
-        is_correct = predicted == expected
-        correct += int(is_correct)
-
-        status = "OK" if is_correct else "MISS"
-        print(f"- {status}: {log_path.name} -> predicted={predicted}, expected={expected}")
-
-    accuracy = correct / total if total else 0.0
-    print("[Step 3] Reporting metrics...")
-    print(f"classification_correct: {correct}/{total}")
-    print(f"accuracy: {accuracy:.0%}")
+    metrics = evaluate(predictions, ground_truth)
+    print("\nEvaluation Results:")
+    print(f"Accuracy: {metrics['accuracy']:.0%}")
+    print(f"Correct: {metrics['correct']}/{metrics['total']}")
+    print(f"Avg Confidence: {metrics['avg_confidence']:.2f}")
+    print(f"Total Samples: {metrics['total']}")
 
 
 if __name__ == "__main__":
