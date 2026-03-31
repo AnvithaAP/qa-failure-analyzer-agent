@@ -8,9 +8,9 @@ def test_evaluate_computes_advanced_metrics():
         {"category": "Environment Issue", "confidence": 0.9, "latency": 1.5},
     ]
     truth = [
-        {"category": "Test Issue"},
-        {"category": "Environment Issue"},
-        {"category": "Environment Issue"},
+        {"category": "Test Issue", "log": "assert failed"},
+        {"category": "Environment Issue", "log": "timeout and assert"},
+        {"category": "Environment Issue", "log": "connection reset"},
     ]
 
     metrics = evaluate(predictions, truth)
@@ -22,3 +22,5 @@ def test_evaluate_computes_advanced_metrics():
     assert metrics["per_category_accuracy"]["Environment Issue"] == 0.5
     assert metrics["misclassifications"][0]["index"] == 2
     assert metrics["confusion"]["Environment Issue -> Product Bug"] == 1
+    assert "precision" in metrics["precision_recall"]["Product Bug"]
+    assert isinstance(metrics["hardest_cases"], list)

@@ -53,6 +53,7 @@ class Analyzer:
             '  "root_cause": "string",\n'
             '  "category": "Product Bug | Test Issue | Environment Issue",\n'
             '  "confidence": 0.0,\n'
+            '  "confidence_reason": "string",\n'
             '  "suggestion": "string"\n'
             "}"
         )
@@ -63,6 +64,25 @@ class Analyzer:
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not set. Please configure your .env file.")
         return OpenAI(api_key=api_key)
+
+    @staticmethod
+    def _extract_usage(completion: Any, text: str) -> dict[str, float]:
+        usage = getattr(completion, "usage", None)
+        if usage:
+            prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+            completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+            return {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            }
+
+        approx_total = max(1, int(len(text) / 4))
+        return {
+            "prompt_tokens": int(approx_total * 0.75),
+            "completion_tokens": int(approx_total * 0.25),
+            "total_tokens": approx_total,
+        }
 
     def summarize_log(self, log_text: str) -> str:
         """Create a compact summary for very large logs before analysis."""
@@ -85,8 +105,8 @@ class Analyzer:
         log_text: str,
         retries: int = 1,
         stronger_prompt: bool = False,
-    ) -> tuple[dict[str, Any], str]:
-        """Call LLM and parse strict JSON with retries. Returns parsed + raw response."""
+    ) -> tuple[dict[str, Any], str, dict[str, float]]:
+        """Call LLM and parse strict JSON with retries. Returns parsed + raw response + usage."""
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         system_prompt = self.system_prompt + (STRONG_PROMPT_SUFFIX if stronger_prompt else "")
 
@@ -112,10 +132,12 @@ class Analyzer:
                 if not isinstance(parsed, dict):
                     raise RuntimeError("LLM response must be a JSON object.")
 
+                usage = self._extract_usage(completion, raw_content)
                 if self.debug:
                     logger.info("[DEBUG] Raw LLM response: %s", raw_content)
                     logger.info("[DEBUG] Parsed JSON: %s", json.dumps(parsed, indent=2))
-                return parsed, raw_content
+                    logger.info("[DEBUG] Token usage: %s", usage)
+                return parsed, raw_content, usage
             except (json.JSONDecodeError, RuntimeError, Exception) as exc:  # noqa: BLE001
                 last_error = exc
                 if attempt < retries:

@@ -17,6 +17,7 @@ def test_classify_failure_overrides_mismatched_llm_category():
     out = classify_failure(result, "TimeoutError: API timed out")
     assert out["category"] == "Environment Issue"
     assert out["confidence"] >= 0.75
+    assert "keyword" in out["confidence_reason"] or "signal" in out["confidence_reason"]
 
 
 def test_validate_output_rejects_invalid_category():
@@ -38,3 +39,4 @@ def test_validate_output_rejects_invalid_category():
 def test_validate_output_accepts_and_defaults_latency():
     out = validate_output({"root_cause": "x", "category": "Test Issue", "confidence": 0.5, "suggestion": "y"})
     assert out["latency"] == 0.0
+    assert out["confidence_reason"]

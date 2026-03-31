@@ -36,8 +36,10 @@ def test_run_batch_outputs_summary(monkeypatch, tmp_path: Path, capsys):
             "root_cause": "x",
             "category": "Test Issue",
             "confidence": 0.8,
+            "confidence_reason": "clear evidence",
             "suggestion": "y",
             "latency": 1.2,
+            "cost_estimate_usd": 0.001,
         }
 
     monkeypatch.setattr(agent, "run_analysis", fake_run_analysis)
@@ -47,3 +49,23 @@ def test_run_batch_outputs_summary(monkeypatch, tmp_path: Path, capsys):
     rendered = capsys.readouterr().out
     assert "Summary: processed=2" in rendered
     assert "category_breakdown={'Test Issue': 2}" in rendered
+
+
+def test_run_ci_mode_generates_report(monkeypatch, tmp_path: Path):
+    stream = tmp_path / "logs.txt"
+    stream.write_text("ERROR timeout\n---\nERROR assertion", encoding="utf-8")
+
+    monkeypatch.setattr(
+        agent,
+        "run_analysis",
+        lambda *args, **kwargs: {
+            "category": "Environment Issue",
+            "confidence": 0.7,
+            "latency": 0.2,
+            "cost_estimate_usd": 0.002,
+        },
+    )
+
+    report = agent.run_ci_mode(stream)
+    assert report["processed_logs"] == 2
+    assert report["total_cost"] == 0.004
