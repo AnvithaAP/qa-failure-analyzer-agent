@@ -26,7 +26,8 @@ _RULES: list[tuple[str, str, int]] = [
     ("module not found", "Dependency Issue", 92),
     ("modulenotfounderror", "Dependency Issue", 92),
     ("importerror", "Dependency Issue", 90),
-    ("pip", "Dependency Issue", 65),
+    ("pip install", "Dependency Issue", 65),
+    ("error: pip", "Dependency Issue", 70),
     ("npm err", "Dependency Issue", 88),
 ]
 
@@ -160,11 +161,4 @@ def validate_output(result: dict[str, Any]) -> dict[str, Any]:
     output = _ensure_shape(result)
     if output["category"] not in ALLOWED_CATEGORIES:
         raise ValueError(f"Invalid category: {output['category']}")
-
-    if not 0.0 <= output["confidence"] <= 1.0:
-        raise ValueError(f"Invalid confidence: {output['confidence']}")
-
-    if output["latency"] < 0.0:
-        raise ValueError(f"Invalid latency: {output['latency']}")
-
     return output

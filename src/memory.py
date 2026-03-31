@@ -11,6 +11,7 @@ from typing import Any
 MEMORY_PATH = Path("memory.json")
 _DEFAULT_MAX_ITEMS = 500
 _DEFAULT_SIMILARITY_THRESHOLD = 0.85
+_SIGNATURE_SIMILARITY_THRESHOLD = 0.7
 
 
 _ERROR_PATTERNS = [
@@ -57,7 +58,7 @@ def retrieve_similar(
     path: Path = MEMORY_PATH,
     threshold: float = _DEFAULT_SIMILARITY_THRESHOLD,
 ) -> dict[str, Any] | None:
-    """Return the most similar previous analysis if above similarity threshold and signature matches."""
+    """Return the most similar previous analysis if above similarity threshold and signature is compatible."""
     best_score = 0.0
     best_result: dict[str, Any] | None = None
 
@@ -66,8 +67,10 @@ def retrieve_similar(
     for entry in _load_memory(path):
         prior_log = str(entry.get("log", ""))
         prior_signature = str(entry.get("signature") or _extract_error_signature(prior_log))
-        if target_signature and prior_signature and target_signature != prior_signature:
-            continue
+        if target_signature and prior_signature:
+            signature_score = SequenceMatcher(None, target_signature, prior_signature).ratio()
+            if signature_score < _SIGNATURE_SIMILARITY_THRESHOLD:
+                continue
 
         score = SequenceMatcher(None, log, prior_log).ratio()
         if score > best_score and score >= threshold:

@@ -10,5 +10,7 @@
   {"file": "examples/logs/product_nullptr.txt", "category": "Product Bug"},
   {"file": "examples/logs/test_flaky_assert.txt", "category": "Test Issue"},
   {"file": "examples/logs/dependency_npm.txt", "category": "Dependency Issue"},
-  {"file": "examples/logs/environment_conn_refused.txt", "category": "Environment Issue"}
+  {"file": "examples/logs/environment_conn_refused.txt", "category": "Environment Issue"},
+  {"file": "examples/logs/ambiguous_product_vs_timeout.txt", "category": "Product Bug"},
+  {"file": "examples/logs/ambiguous_test_vs_dependency.txt", "category": "Test Issue"}
 ]
