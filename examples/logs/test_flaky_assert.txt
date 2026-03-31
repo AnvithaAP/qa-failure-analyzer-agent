@@ -1,0 +1,2 @@
+AssertionError: expected status=200 but got 503
+at tests/test_api_contract.py::test_readings_contract

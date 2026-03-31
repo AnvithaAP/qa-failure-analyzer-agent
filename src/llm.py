@@ -15,6 +15,7 @@ load_dotenv()
 logger = logging.getLogger("qa_failure_analyzer")
 
 DEFAULT_PROMPT_VERSION = "v1"
+DEFAULT_PROVIDER = "openai"
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 
 STRONG_PROMPT_SUFFIX = (
@@ -52,7 +53,7 @@ class Analyzer:
             "JSON schema:\n"
             "{\n"
             '  "root_cause": "string",\n'
-            '  "category": "Product Bug | Test Issue | Environment Issue",\n'
+            '  "category": "Product Bug | Test Issue | Environment Issue | Dependency Issue",\n'
             '  "confidence": 0.0,\n'
             '  "confidence_reason": "string",\n'
             '  "suggestion": "string"\n'
@@ -61,6 +62,13 @@ class Analyzer:
 
     @staticmethod
     def _client() -> OpenAI:
+        provider = os.getenv("LLM_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+        if provider != "openai":
+            raise RuntimeError(
+                f"Unsupported LLM_PROVIDER={provider!r}. This project currently supports OpenAI only. "
+                "Set LLM_PROVIDER=openai or extend Analyzer with another provider client."
+            )
+
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not set. Please configure your .env file.")

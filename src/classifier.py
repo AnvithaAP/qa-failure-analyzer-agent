@@ -23,12 +23,30 @@ _RULES: list[tuple[str, str, int]] = [
     ("nosuchelementexception", "Test Issue", 83),
     ("locator", "Test Issue", 75),
     ("element not found", "Test Issue", 78),
+    ("module not found", "Dependency Issue", 92),
+    ("modulenotfounderror", "Dependency Issue", 92),
+    ("importerror", "Dependency Issue", 90),
+    ("pip", "Dependency Issue", 65),
+    ("npm err", "Dependency Issue", 88),
 ]
+
+_CATEGORY_ALIASES = {
+    "productbug": "Product Bug",
+    "product bug": "Product Bug",
+    "testissue": "Test Issue",
+    "test issue": "Test Issue",
+    "environmentissue": "Environment Issue",
+    "environment issue": "Environment Issue",
+    "environmental issue": "Environment Issue",
+    "dependencyissue": "Dependency Issue",
+    "dependency issue": "Dependency Issue",
+    "dependency failure": "Dependency Issue",
+}
 
 
 def _load_categories() -> set[str]:
     if not _CATEGORIES_PATH.exists():
-        return {"Product Bug", "Test Issue", "Environment Issue"}
+        return {"Product Bug", "Test Issue", "Environment Issue", "Dependency Issue"}
     payload = json.loads(_CATEGORIES_PATH.read_text(encoding="utf-8"))
     categories = payload.get("categories", [])
     return {str(item).strip() for item in categories if str(item).strip()}
@@ -53,10 +71,27 @@ def _normalize_latency(latency: Any) -> float:
     return max(0.0, parsed)
 
 
+def _normalize_category(raw: Any) -> str:
+    candidate = str(raw or "").strip()
+    if candidate in ALLOWED_CATEGORIES:
+        return candidate
+
+    lowered = candidate.lower()
+    compact = " ".join(lowered.split())
+    alias = _CATEGORY_ALIASES.get(compact) or _CATEGORY_ALIASES.get(compact.replace(" ", ""))
+    if alias and alias in ALLOWED_CATEGORIES:
+        return alias
+
+    for allowed in ALLOWED_CATEGORIES:
+        if compact == allowed.lower():
+            return allowed
+    return "Test Issue"
+
+
 def _ensure_shape(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "root_cause": str(result.get("root_cause") or "Unable to determine from provided log.").strip(),
-        "category": str(result.get("category") or "Test Issue").strip(),
+        "category": _normalize_category(result.get("category") or "Test Issue"),
         "confidence": _normalize_confidence(result.get("confidence")),
         "confidence_reason": str(result.get("confidence_reason") or "Moderate confidence due to partial signal coverage.").strip(),
         "suggestion": str(result.get("suggestion") or "Collect additional logs and retry analysis.").strip(),

@@ -29,8 +29,8 @@ def main() -> None:
     cases: dict[str, str] = {
         "very_large_log": ("ERROR Timeout while connecting\n" * 20000),
         "empty_log": "   ",
-        "random_noise": "zxqv 123 ### ???\\n" * 500,
-        "multiple_errors": "ERROR Timeout reached\\nAssertionError expected 1 got 2\\nHTTP 500 Internal Server Error",
+        "random_noise": ("zxqv 123 ### ???\n" * 500),
+        "multiple_errors": "ERROR Timeout reached\nAssertionError expected 1 got 2\nHTTP 500 Internal Server Error",
     }
 
     summary: list[dict[str, Any]] = []

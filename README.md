@@ -6,6 +6,15 @@ It combines **LLM reasoning** with **deterministic rule checks** so teams get bo
 
 ---
 
+## Model Provider Support
+
+This repository currently supports **OpenAI only** (`LLM_PROVIDER=openai`).
+
+- Required env vars: `OPENAI_API_KEY`
+- Optional env var: `OPENAI_MODEL` (default: `gpt-4o-mini`)
+
+If you need Anthropic/local model support, extend `src/llm.py` with an additional provider client and preserve the same JSON output contract.
+
 ## Why This Matters
 
 Traditional failure analysis in QA pipelines is often inefficient:
@@ -82,7 +91,7 @@ Structured JSON enables downstream automation (dashboards, alerts, ticketing, an
 
 ### Accuracy vs cost tradeoff
 
-Higher reasoning depth can improve classification quality, but increases token usage and latency. This project explicitly surfaces `confidence`, `token_estimate`, and `cost_estimate_usd` so teams can tune for their SLA and budget.
+Higher reasoning depth can improve classification quality, but increases token usage and latency. This project explicitly surfaces `confidence`, `metrics.tokens`, and `metrics.cost_estimate` so teams can tune for their SLA and budget.
 
 ---
 
@@ -169,6 +178,8 @@ python src/agent.py --file examples/logs/timeout.txt
 python src/agent.py --folder examples/logs/
 python src/agent.py --ci-mode examples/sample_logs.txt
 python src/agent.py --file examples/logs/assertion.txt --prompt v2 --debug
+python src/agent.py --file examples/logs/assertion.txt --no-cache
+python src/agent.py --file examples/logs/assertion.txt --clear-cache
 ```
 
 ### CI Mode
@@ -287,3 +298,10 @@ python src/agent.py --log "TimeoutError: API did not respond" --deterministic --
 python src/agent.py --folder examples/logs --ci-report --output ci_report.json
 python stress_test.py
 ```
+
+
+## Privacy & Cost Guardrails
+
+- Scrub credentials/tokens/PII from logs before sending to the LLM.
+- Large logs are summarized to reduce prompt size and token spend.
+- For strict data residency/security constraints, use this agent with a provider implementation that can run in your trusted environment.

@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import time
 from collections import Counter
 from pathlib import Path
@@ -23,6 +24,7 @@ _CONFIDENCE_WARNING_THRESHOLD = 0.6
 _LARGE_LOG_THRESHOLD = 8000
 _SIMPLIFIED_LOG_CHARS = 1200
 _CACHE: dict[str, dict[str, Any]] = {}
+_DEFAULT_CACHE_MAX_ITEMS = 200
 _COST_PER_1K_TOKENS = 0.0005
 
 
@@ -30,6 +32,34 @@ def _cache_key(log_text: str, prompt_version: str, deterministic: bool) -> str:
     payload = f"{prompt_version}:{deterministic}:{log_text}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+
+
+
+def clear_runtime_cache() -> None:
+    _CACHE.clear()
+
+
+def _cache_enabled() -> bool:
+    return os.getenv("QA_ANALYZER_DISABLE_CACHE", "0").strip() not in {"1", "true", "yes"}
+
+
+def _cache_max_items() -> int:
+    raw = os.getenv("QA_ANALYZER_CACHE_MAX_ITEMS", str(_DEFAULT_CACHE_MAX_ITEMS)).strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return _DEFAULT_CACHE_MAX_ITEMS
+
+
+def _set_cache(key: str, value: dict[str, Any]) -> None:
+    max_items = _cache_max_items()
+    if key in _CACHE:
+        _CACHE[key] = value
+        return
+    if len(_CACHE) >= max_items:
+        oldest = next(iter(_CACHE))
+        _CACHE.pop(oldest, None)
+    _CACHE[key] = value
 
 def should_retry(confidence: float) -> bool:
     return confidence < _CONFIDENCE_WARNING_THRESHOLD
@@ -166,7 +196,7 @@ def run_analysis(
         }
 
     key = _cache_key(cleaned_log, prompt_version, deterministic)
-    if key in _CACHE:
+    if _cache_enabled() and key in _CACHE:
         cached = dict(_CACHE[key])
         cached["steps"] = steps + [{"step": "cache", "summary": "Used cached response.", "latency": 0.0}]
         return cached
@@ -174,7 +204,8 @@ def run_analysis(
     memory_hit = retrieve_similar(cleaned_log)
     if memory_hit:
         out = validate_output(memory_hit)
-        out["reasoning"] = "Reused classification from highly similar prior log in memory."
+        out["reasoning"] = "Reused classification from a prior log with matching error signature and high similarity."
+        out["memory_reuse"] = {"enabled": True, "warning": "Classification reused from memory; verify if this is a distinct failure instance."}
         out["steps"] = steps + [
             {"step": "llm_analysis", "summary": "Skipped LLM due to memory hit.", "latency": 0.0},
             {"step": "classification", "summary": "Reused prior decision.", "decision": out["category"], "latency": 0.0},
@@ -280,7 +311,8 @@ def run_analysis(
     if quality["is_partial"] or quality["is_truncated"]:
         output["confidence"] = round(max(0.1, output["confidence"] - 0.1), 2)
 
-    _CACHE[key] = output
+    if _cache_enabled():
+        _set_cache(key, output)
     store_result(cleaned_log, output)
     return output
 
@@ -364,6 +396,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--deterministic", action="store_true", help="Enable deterministic low-variance mode.")
     parser.add_argument("--prompt", type=str, default=DEFAULT_PROMPT_VERSION, help="Prompt version to use (e.g., v1, v2).")
     parser.add_argument("--debug", action="store_true", help="Enable debug traces for analyzer and classifier internals.")
+    parser.add_argument("--no-cache", action="store_true", help="Disable in-process response cache for this run.")
+    parser.add_argument("--clear-cache", action="store_true", help="Clear in-process cache before running analysis.")
     return parser.parse_args()
 
 
@@ -385,6 +419,10 @@ def _write_json_output(path: Path, payload: Any) -> None:
 def main() -> None:
     args = _parse_args()
     logging.basicConfig(level=logging.INFO if args.debug else logging.WARNING, format="%(message)s")
+    if args.no_cache:
+        os.environ["QA_ANALYZER_DISABLE_CACHE"] = "1"
+    if args.clear_cache:
+        clear_runtime_cache()
     try:
         if args.folder:
             outputs = run_batch(args.folder, prompt_version=args.prompt, debug=args.debug, deterministic=args.deterministic)

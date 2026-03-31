@@ -1,0 +1,3 @@
+2026-03-28T09:14:23Z ERROR mqtt client connect failed
+socket.gaierror: [Errno -2] Name or service not known
+test setup aborted before first test step

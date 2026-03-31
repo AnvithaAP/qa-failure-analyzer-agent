@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+import json
 from collections import Counter, defaultdict
+from pathlib import Path
 from typing import Any
 
-CATEGORIES = ("Product Bug", "Test Issue", "Environment Issue")
+
+def _load_categories() -> tuple[str, ...]:
+    categories_path = Path(__file__).resolve().parent / "categories.json"
+    if not categories_path.exists():
+        return ("Product Bug", "Test Issue", "Environment Issue")
+    payload = json.loads(categories_path.read_text(encoding="utf-8"))
+    categories = [str(item).strip() for item in payload.get("categories", []) if str(item).strip()]
+    return tuple(categories) if categories else ("Product Bug", "Test Issue", "Environment Issue")
+
+
+CATEGORIES = _load_categories()
 
 
 def _short_log(log_text: str, max_len: int = 120) -> str:
@@ -101,7 +113,8 @@ def evaluate(predictions: list[dict[str, Any]], ground_truth: list[dict[str, Any
             confusion[f"{expected_category} -> {predicted_category}"] += 1
 
         confidence_sum += float(prediction.get("confidence", 0.0))
-        latency_sum += float(prediction.get("latency", 0.0))
+        metrics = prediction.get("metrics", {})
+        latency_sum += float(metrics.get("latency", prediction.get("latency", 0.0)))
 
     per_category_accuracy = {
         category: (counts[category]["correct"] / counts[category]["total"] if counts[category]["total"] else 0.0)

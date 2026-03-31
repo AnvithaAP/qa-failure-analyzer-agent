@@ -1,7 +1,14 @@
 [
-  {"file": "examples/timeout_failure.txt", "category": "Environment Issue"},
-  {"file": "examples/assertion_failure.txt", "category": "Test Issue"},
-  {"file": "examples/locator_failure.txt", "category": "Test Issue"},
-  {"file": "examples/db_failure.txt", "category": "Environment Issue"},
-  {"file": "examples/product_bug_failure.txt", "category": "Product Bug"}
+  {"file": "examples/logs/timeout.txt", "category": "Environment Issue"},
+  {"file": "examples/logs/assertion.txt", "category": "Test Issue"},
+  {"file": "examples/logs/locator.txt", "category": "Test Issue"},
+  {"file": "examples/logs/api_error.txt", "category": "Product Bug"},
+  {"file": "examples/logs/db_failure.txt", "category": "Environment Issue"},
+  {"file": "examples/logs/dependency_pip.txt", "category": "Dependency Issue"},
+  {"file": "examples/logs/dependency_module.txt", "category": "Dependency Issue"},
+  {"file": "examples/logs/network_dns.txt", "category": "Environment Issue"},
+  {"file": "examples/logs/product_nullptr.txt", "category": "Product Bug"},
+  {"file": "examples/logs/test_flaky_assert.txt", "category": "Test Issue"},
+  {"file": "examples/logs/dependency_npm.txt", "category": "Dependency Issue"},
+  {"file": "examples/logs/environment_conn_refused.txt", "category": "Environment Issue"}
 ]

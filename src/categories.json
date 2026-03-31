@@ -2,6 +2,7 @@
   "categories": [
     "Product Bug",
     "Test Issue",
-    "Environment Issue"
+    "Environment Issue",
+    "Dependency Issue"
   ]
 }
