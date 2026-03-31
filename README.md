@@ -22,10 +22,12 @@ Includes:
 - log cleaning + truncation
 - large-log summarization before analysis
 - confidence-based retry with stronger prompt
+- confidence-based retry with simplified signal-only log fallback
 - hybrid rule-based classification override
 - validation guardrails and standardized latency field
 - caching + JSON memory for similar logs
 - batch processing mode for real-world multi-log runs
+- batch summary metrics (category mix, avg confidence, avg latency)
 
 ## Project Structure
 

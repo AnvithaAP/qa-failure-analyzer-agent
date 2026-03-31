@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ logger = logging.getLogger("qa_failure_analyzer")
 
 _CONFIDENCE_WARNING_THRESHOLD = 0.6
 _LARGE_LOG_THRESHOLD = 800
+_SIMPLIFIED_LOG_CHARS = 500
 _CACHE: dict[str, dict[str, Any]] = {}
 
 
@@ -29,6 +31,18 @@ def _cache_key(log_text: str) -> str:
 
 def should_retry(confidence: float) -> bool:
     return confidence < _CONFIDENCE_WARNING_THRESHOLD
+
+
+def _build_simplified_log(log_text: str, max_chars: int = _SIMPLIFIED_LOG_CHARS) -> str:
+    """Build a compact signal-first log for fallback retries."""
+    lines = [line.strip() for line in log_text.splitlines() if line.strip()]
+    signal_lines = [
+        line
+        for line in lines
+        if any(token in line.lower() for token in ("error", "exception", "failed", "timeout"))
+    ]
+    candidate = "\n".join(signal_lines or lines)
+    return candidate[:max_chars]
 
 
 def _analyze_with_adaptive_logic(cleaned_log: str) -> tuple[dict[str, Any], bool]:
@@ -45,7 +59,7 @@ def _analyze_with_adaptive_logic(cleaned_log: str) -> tuple[dict[str, Any], bool
 
     if should_retry(classified["confidence"]):
         logger.info("[INFO] LLM confidence: %.2f → RETRY triggered", classified["confidence"])
-        retry_input = analysis_input if use_summary else clean_log(cleaned_log)
+        retry_input = _build_simplified_log(analysis_input if use_summary else cleaned_log)
         retry_result = analyze_log(retry_input, retries=1, stronger_prompt=True)
         retry_classified = validate_output(classify_failure(retry_result, cleaned_log))
         if retry_classified["confidence"] >= classified["confidence"]:
@@ -98,8 +112,16 @@ def run_batch(folder: Path) -> list[dict[str, Any]]:
         outputs.append(result_with_file)
 
     avg_latency = sum(item["latency"] for item in outputs) / len(outputs) if outputs else 0.0
+    avg_confidence = sum(item["confidence"] for item in outputs) / len(outputs) if outputs else 0.0
+    category_counter = Counter(item["category"] for item in outputs)
     print(json.dumps(outputs, indent=2))
-    print(f"Processed {len(outputs)} logs. Average latency: {avg_latency:.3f} seconds")
+    print(
+        "Summary: "
+        f"processed={len(outputs)} "
+        f"avg_confidence={avg_confidence:.2f} "
+        f"avg_latency={avg_latency:.3f}s "
+        f"category_breakdown={dict(category_counter)}"
+    )
     return outputs
 
 

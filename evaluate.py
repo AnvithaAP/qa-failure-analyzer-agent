@@ -60,6 +60,11 @@ def main() -> None:
     else:
         print("- None")
 
+    if metrics["confusion"]:
+        print("\nConfusion Totals:")
+        for key, value in sorted(metrics["confusion"].items()):
+            print(f"- {key}: {value}")
+
 
 if __name__ == "__main__":
     main()
