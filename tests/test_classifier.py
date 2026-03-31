@@ -33,3 +33,8 @@ def test_validate_output_rejects_invalid_category():
         assert "Invalid category" in str(exc)
     else:
         raise AssertionError("Expected validate_output to raise ValueError")
+
+
+def test_validate_output_accepts_and_defaults_latency():
+    out = validate_output({"root_cause": "x", "category": "Test Issue", "confidence": 0.5, "suggestion": "y"})
+    assert out["latency"] == 0.0

@@ -29,12 +29,21 @@ def _normalize_confidence(confidence: Any) -> float:
     return max(0.0, min(1.0, parsed))
 
 
+def _normalize_latency(latency: Any) -> float:
+    try:
+        parsed = float(latency)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, parsed)
+
+
 def _ensure_shape(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "root_cause": str(result.get("root_cause") or "Unable to determine from provided log.").strip(),
         "category": str(result.get("category") or "Test Issue").strip(),
         "confidence": _normalize_confidence(result.get("confidence")),
         "suggestion": str(result.get("suggestion") or "Collect additional logs and retry analysis.").strip(),
+        "latency": _normalize_latency(result.get("latency", 0.0)),
     }
 
 
@@ -67,5 +76,8 @@ def validate_output(result: dict[str, Any]) -> dict[str, Any]:
 
     if not 0.0 <= output["confidence"] <= 1.0:
         raise ValueError(f"Invalid confidence: {output['confidence']}")
+
+    if output["latency"] < 0.0:
+        raise ValueError(f"Invalid latency: {output['latency']}")
 
     return output
