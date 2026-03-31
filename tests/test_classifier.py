@@ -5,6 +5,7 @@ def test_infer_category_from_rules_handles_common_failures():
     assert infer_category_from_rules("TimeoutError: API did not respond") == "Environment Issue"
     assert infer_category_from_rules("AssertionError: expected 1 got 2") == "Test Issue"
     assert infer_category_from_rules("HTTP 500 Internal Server Error") == "Product Bug"
+    assert infer_category_from_rules("ModuleNotFoundError: No module named 'x'") == "Dependency Issue"
 
 
 def test_classify_failure_overrides_mismatched_llm_category():
@@ -20,20 +21,16 @@ def test_classify_failure_overrides_mismatched_llm_category():
     assert "keyword" in out["confidence_reason"] or "signal" in out["confidence_reason"]
 
 
-def test_validate_output_rejects_invalid_category():
-    try:
-        validate_output(
-            {
-                "root_cause": "x",
-                "category": "Unknown",
-                "confidence": 0.6,
-                "suggestion": "y",
-            }
-        )
-    except ValueError as exc:
-        assert "Invalid category" in str(exc)
-    else:
-        raise AssertionError("Expected validate_output to raise ValueError")
+def test_validate_output_normalizes_invalid_category_instead_of_raising():
+    out = validate_output(
+        {
+            "root_cause": "x",
+            "category": "environmental issue",
+            "confidence": 0.6,
+            "suggestion": "y",
+        }
+    )
+    assert out["category"] == "Environment Issue"
 
 
 def test_validate_output_accepts_and_defaults_latency():

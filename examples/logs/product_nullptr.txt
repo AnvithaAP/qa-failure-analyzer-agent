@@ -1,0 +1,2 @@
+java.lang.NullPointerException: Cannot invoke "FlowMeter.reading()" because "meter" is null
+at com.hubiq.pipeline.DeviceCollector.collect(DeviceCollector.java:61)

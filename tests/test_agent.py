@@ -70,3 +70,16 @@ def test_run_ci_mode_generates_report(monkeypatch, tmp_path: Path):
     report = agent.run_ci_mode(stream)
     assert report["processed_logs"] == 2
     assert report["total_cost"] == 0.004
+
+
+def test_runtime_cache_helpers(monkeypatch):
+    agent._CACHE.clear()
+    monkeypatch.setenv("QA_ANALYZER_CACHE_MAX_ITEMS", "1")
+    agent._set_cache("a", {"category": "Test Issue"})
+    agent._set_cache("b", {"category": "Product Bug"})
+    assert "a" not in agent._CACHE
+    assert "b" in agent._CACHE
+
+    monkeypatch.setenv("QA_ANALYZER_DISABLE_CACHE", "1")
+    assert not agent._cache_enabled()
+

@@ -1,0 +1,3 @@
+npm ERR! code ERESOLVE
+npm ERR! ERESOLVE unable to resolve dependency tree
+npm ERR! peer react@"^19" from @acme/device-dashboard@1.4.0
