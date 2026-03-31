@@ -1,0 +1,7 @@
+2026-03-31 09:01:10 INFO Running test: test_checkout_submit_order
+2026-03-31 09:01:11 DEBUG Opening browser session
+2026-03-31 09:01:21 ERROR AssertionError: Expected status code 201 but got 500
+Traceback (most recent call last):
+  File "tests/test_checkout.py", line 87, in test_checkout_submit_order
+    assert response.status_code == 201
+AssertionError: 500 != 201
