@@ -6,6 +6,35 @@ It combines **LLM reasoning** with **deterministic rule checks** so teams get bo
 
 ---
 
+## TL;DR (for fast repo scanning)
+
+- **What it is:** an intelligent QA triage agent that converts raw failure logs into structured JSON.
+- **Why it matters:** reduces manual triage time and makes classification consistent across engineers.
+- **How it works:** hybrid pipeline (**LLM + deterministic rules + validation + memory**).
+- **What you get:** root cause, category, confidence, suggestion, latency, and cost estimates.
+
+### 5-second demo (input → output)
+
+```bash
+python src/agent.py --log "TimeoutError: API did not respond"
+```
+
+```json
+{
+  "root_cause": "External API did not respond within expected timeout window.",
+  "category": "Environment Issue",
+  "confidence": 0.86,
+  "confidence_reason": "Confidence combines keyword match, LLM certainty, and rule overrides; strongest signal='timeout' (severity=80).",
+  "suggestion": "Verify network health, API availability, and retry policy configuration.",
+  "latency": 0.123,
+  "prompt_version": "v1",
+  "token_estimate": 420,
+  "cost_estimate_usd": 0.00021
+}
+```
+
+---
+
 ## Model Provider Support
 
 This repository currently supports **OpenAI only** (`LLM_PROVIDER=openai`).
@@ -116,6 +145,8 @@ Includes:
 - caching + JSON memory for similar logs
 - batch processing mode for real-world multi-log runs
 
+**Readability principle:** pipeline stages are intentionally separated (analyzer, classifier, evaluator) to keep logic auditable and avoid unnecessary branching complexity as features grow.
+
 ---
 
 ## 📊 What the Metrics Mean
@@ -142,32 +173,6 @@ Confidence should be treated cautiously when logs are truncated, partial, ambigu
 - Small evaluation dataset size limiting confidence in generalization.
 
 Use this tool as a triage accelerator, with human review for high-impact incidents.
-
----
-
-## ▶️ Quick Demo
-
-Run:
-
-```bash
-python src/agent.py --log "TimeoutError: API did not respond"
-```
-
-Example output:
-
-```json
-{
-  "root_cause": "External API did not respond within expected timeout window.",
-  "category": "Environment Issue",
-  "confidence": 0.86,
-  "confidence_reason": "Confidence combines keyword match, LLM certainty, and rule overrides; strongest signal='timeout' (severity=80).",
-  "suggestion": "Verify network health, API availability, and retry policy configuration.",
-  "latency": 0.123,
-  "prompt_version": "v1",
-  "token_estimate": 420,
-  "cost_estimate_usd": 0.00021
-}
-```
 
 ---
 
