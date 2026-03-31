@@ -31,7 +31,7 @@ def test_run_batch_outputs_summary(monkeypatch, tmp_path: Path, capsys):
     (logs_dir / "a.txt").write_text("A", encoding="utf-8")
     (logs_dir / "b.txt").write_text("B", encoding="utf-8")
 
-    def fake_run_analysis(_: str, prompt_version: str = "v1", debug: bool = False) -> dict[str, object]:
+    def fake_run_analysis(_: str, prompt_version: str = "v1", debug: bool = False, deterministic: bool = False) -> dict[str, object]:
         return {
             "root_cause": "x",
             "category": "Test Issue",
@@ -39,7 +39,8 @@ def test_run_batch_outputs_summary(monkeypatch, tmp_path: Path, capsys):
             "confidence_reason": "clear evidence",
             "suggestion": "y",
             "latency": 1.2,
-            "cost_estimate_usd": 0.001,
+            "metrics": {"latency": 1.2, "cost_estimate": 0.001},
+            "steps": [],
         }
 
     monkeypatch.setattr(agent, "run_analysis", fake_run_analysis)
@@ -61,8 +62,8 @@ def test_run_ci_mode_generates_report(monkeypatch, tmp_path: Path):
         lambda *args, **kwargs: {
             "category": "Environment Issue",
             "confidence": 0.7,
-            "latency": 0.2,
-            "cost_estimate_usd": 0.002,
+            "metrics": {"latency": 0.2, "cost_estimate": 0.002},
+            "steps": [],
         },
     )
 

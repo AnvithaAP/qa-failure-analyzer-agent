@@ -31,9 +31,10 @@ SUMMARY_PROMPT = (
 class Analyzer:
     """Analyzer role: owns all LLM interactions and prompt versioning."""
 
-    def __init__(self, prompt_version: str = DEFAULT_PROMPT_VERSION, debug: bool = False) -> None:
+    def __init__(self, prompt_version: str = DEFAULT_PROMPT_VERSION, debug: bool = False, deterministic: bool = False) -> None:
         self.prompt_version = prompt_version
         self.debug = debug
+        self.deterministic = deterministic
         self.system_prompt = self._load_prompt(prompt_version)
 
     def _load_prompt(self, prompt_version: str) -> str:
@@ -84,12 +85,15 @@ class Analyzer:
             "total_tokens": approx_total,
         }
 
-    def summarize_log(self, log_text: str) -> str:
+    def _temperature(self) -> float:
+        return 0.0 if self.deterministic else 0.1
+
+    def summarize_log(self, log_text: str) -> tuple[str, dict[str, float]]:
         """Create a compact summary for very large logs before analysis."""
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         completion = self._client().chat.completions.create(
             model=model,
-            temperature=0,
+            temperature=self._temperature(),
             messages=[
                 {"role": "system", "content": SUMMARY_PROMPT},
                 {"role": "user", "content": log_text},
@@ -98,7 +102,7 @@ class Analyzer:
         summary = completion.choices[0].message.content
         if not summary:
             raise RuntimeError("LLM returned empty summary.")
-        return summary
+        return summary, self._extract_usage(completion, summary)
 
     def analyze_log(
         self,
@@ -116,7 +120,7 @@ class Analyzer:
                 logger.info("[INFO] Analyzer using prompt=%s model=%s", self.prompt_version, model)
                 completion = self._client().chat.completions.create(
                     model=model,
-                    temperature=0,
+                    temperature=self._temperature(),
                     response_format={"type": "json_object"},
                     messages=[
                         {"role": "system", "content": system_prompt},

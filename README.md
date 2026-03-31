@@ -249,3 +249,41 @@ qa-failure-analyzer-agent/
 ├── requirements.txt
 └── evaluate.py
 ```
+
+
+---
+
+
+## 🔒 Reliability Features
+
+- Multi-stage fallback strategy: stronger prompt retry, summarized-log retry, deterministic rule fallback, and safe default.
+- Input sanitization via `sanitize_input(log: str)` to strip prompt-injection patterns and suspicious command payloads.
+- Deterministic mode (`--deterministic`) for reproducible outputs with low-variance LLM settings.
+- Explicit edge-case handling for empty logs, very large logs, no-error-signal logs, and conflicting multi-error logs.
+
+## 🔍 Explainability
+
+- Full step trace emitted in `steps` for each run (`cleaning`, `llm_analysis`, `classification`, `validation`, plus fallback steps when used).
+- Deterministic `reasoning` field in final output for auditability and incident triage trust.
+- Version metadata attached to every output: `agent_version` and `prompt_version`.
+
+## ⚙️ Production Readiness
+
+- Machine-consumable JSON output with `--output result.json`.
+- CI/CD summary report mode with `--ci-report`:
+  - `total_logs`
+  - `failures_detected`
+  - `categories`
+- Performance and cost visibility in `metrics`:
+  - total latency
+  - approximate token usage
+  - estimated cost
+- Added `stress_test.py` for robustness smoke checks on large logs, empty logs, random noise, and conflicting errors.
+
+### New CLI examples
+
+```bash
+python src/agent.py --log "TimeoutError: API did not respond" --deterministic --output result.json
+python src/agent.py --folder examples/logs --ci-report --output ci_report.json
+python stress_test.py
+```
