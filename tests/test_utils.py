@@ -1,4 +1,4 @@
-from src.utils import clean_log, truncate_log
+from src.utils import assess_log_quality, clean_log, detect_error_events, split_ci_log_stream, truncate_log
 
 
 def test_clean_log_removes_debug_and_timestamps():
@@ -20,3 +20,25 @@ def test_truncate_log_shortens_large_input():
 
     assert len(truncated) > 100
     assert "TRUNCATED" in truncated
+
+
+def test_detect_error_events_supports_multiline_and_multiple_errors():
+    log = """INFO setup
+ERROR TimeoutError: request failed
+  at service.call
+INFO middle
+Exception in thread: AssertionError expected 1 got 2
+  at test_case
+"""
+    events = detect_error_events(log)
+    assert len(events) == 2
+    assert "at service.call" in events[0]
+
+
+def test_split_ci_log_stream_and_quality_flags():
+    payload = "ERROR Timeout\n---\nERROR Assertion"
+    blocks = split_ci_log_stream(payload)
+    assert len(blocks) == 2
+
+    quality = assess_log_quality("ERROR Timeout\n...[TRUNCATED FOR ANALYSIS]...")
+    assert quality["is_truncated"]
