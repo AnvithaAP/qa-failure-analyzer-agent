@@ -1,10 +1,13 @@
-"""Rule-based corrections and validation for model output."""
+"""Rule-based classifier role and output validation."""
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any
 
 ALLOWED_CATEGORIES = {"Product Bug", "Test Issue", "Environment Issue"}
+logger = logging.getLogger("qa_failure_analyzer")
 
 _RULES: list[tuple[str, str]] = [
     ("timeout", "Environment Issue"),
@@ -55,17 +58,37 @@ def infer_category_from_rules(log_text: str) -> str | None:
     return None
 
 
-def classify_failure(result: dict[str, Any], log_text: str) -> dict[str, Any]:
-    """Hybrid classification: trust rules when a strong keyword match is found."""
-    output = _ensure_shape(result)
-    rule_category = infer_category_from_rules(log_text)
-    if not rule_category:
-        return output
+class Classifier:
+    """Classifier role: merges LLM output with deterministic rules."""
 
-    if output["category"] != rule_category:
-        output["category"] = rule_category
-        output["confidence"] = max(output["confidence"], 0.75)
-    return output
+    def __init__(self, debug: bool = False) -> None:
+        self.debug = debug
+
+    def classify_failure(self, result: dict[str, Any], log_text: str) -> tuple[dict[str, Any], str | None]:
+        output = _ensure_shape(result)
+        rule_category = infer_category_from_rules(log_text)
+        if not rule_category:
+            if self.debug:
+                logger.info("[DEBUG] Classification adjustments: none (no rule match)")
+            return output, None
+
+        adjustment_reason: str | None = None
+        if output["category"] != rule_category:
+            adjustment_reason = (
+                f"Rule override applied: '{output['category']}' -> '{rule_category}' based on keyword evidence"
+            )
+            output["category"] = rule_category
+            output["confidence"] = max(output["confidence"], 0.75)
+        if self.debug:
+            logger.info("[DEBUG] Classification adjustments: %s", adjustment_reason or "none")
+            logger.info("[DEBUG] Classified output: %s", json.dumps(output, indent=2))
+        return output, adjustment_reason
+
+
+def classify_failure(result: dict[str, Any], log_text: str) -> dict[str, Any]:
+    """Backward-compatible helper function."""
+    classified, _ = Classifier(debug=False).classify_failure(result, log_text)
+    return classified
 
 
 def validate_output(result: dict[str, Any]) -> dict[str, Any]:

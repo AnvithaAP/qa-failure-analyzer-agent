@@ -1,6 +1,6 @@
 # QA Failure Analyzer Agent
 
-A production-aware Python agent that transforms QA test logs into structured failure analysis with adaptive behavior, memory, and measurable performance.
+A production-aware Python system that transforms QA logs into structured failure analysis with explicit role separation, evaluation introspection, prompt experimentation, and reproducible execution.
 
 ## Structured Output
 
@@ -10,24 +10,33 @@ A production-aware Python agent that transforms QA test logs into structured fai
   "category": "Product Bug | Test Issue | Environment Issue",
   "confidence": 0.0,
   "suggestion": "...",
-  "latency": 0.0
+  "latency": 0.0,
+  "prompt_version": "v1"
 }
 ```
 
+## System Roles
+
+- **Analyzer (LLM)**: interprets logs with strict JSON output using versioned prompts in `prompts/`.
+- **Classifier (rules)**: applies deterministic overrides for known failure signatures.
+- **Evaluator**: reports quality metrics, per-error reasoning, and top failure patterns.
+
+This separation improves extensibility and makes behavior easier to tune and audit.
+
 ## Pipeline
 
-`clean_log -> (optional summarize) -> analyze_log -> classify_failure -> validate_output -> memory`
+`clean_log -> (optional summarize) -> analyzer -> classifier -> validate_output -> memory`
 
 Includes:
 - log cleaning + truncation
 - large-log summarization before analysis
-- confidence-based retry with stronger prompt
+- confidence-based retry with stronger prompt behavior
 - confidence-based retry with simplified signal-only log fallback
 - hybrid rule-based classification override
 - validation guardrails and standardized latency field
+- prompt version tracking (`prompt_version` in every output)
 - caching + JSON memory for similar logs
 - batch processing mode for real-world multi-log runs
-- batch summary metrics (category mix, avg confidence, avg latency)
 
 ## Project Structure
 
@@ -40,25 +49,23 @@ qa-failure-analyzer-agent/
 │   ├── memory.py
 │   ├── utils.py
 │   └── evaluator.py
+├── prompts/
+│   ├── v1.txt
+│   └── v2.txt
 ├── examples/
 │   └── logs/
 ├── tests/
-├── memory.json
+├── .env.example
 ├── requirements.txt
 └── evaluate.py
 ```
 
-## Setup
+### ▶️ Quick Start
 
 ```bash
 pip install -r requirements.txt
-```
-
-Set environment variables:
-
-```env
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4o-mini
+cp .env.example .env
+python src/agent.py --log "TimeoutError: API did not respond"
 ```
 
 ## CLI Usage
@@ -67,47 +74,47 @@ OPENAI_MODEL=gpt-4o-mini
 python src/agent.py --log "TimeoutError: API did not respond"
 python src/agent.py --file examples/logs/timeout.txt
 python src/agent.py --folder examples/logs/
+python src/agent.py --file examples/logs/assertion.txt --prompt v2
+python src/agent.py --file examples/logs/assertion.txt --prompt v2 --debug
 ```
+
+### Debug Mode (`--debug`)
+
+When enabled, the system prints:
+- raw LLM response
+- parsed JSON payload
+- classifier adjustments (including rule override reasons)
 
 ## 📊 Evaluation Metrics
 
-The evaluation runner now reports:
-- overall accuracy
-- per-category accuracy (Product Bug, Test Issue, Environment Issue)
-- misclassifications + confusion direction
-- average confidence
-- average latency
+Run:
 
 ```bash
 python evaluate.py
 ```
 
-Example:
+The evaluation output includes:
+- overall accuracy
+- per-category accuracy
+- average confidence and latency
+- per-misclassification introspection (`Log`, `Expected`, `Predicted`, `Reason`)
+- top failure patterns summary
+- confusion totals
 
-```text
-Evaluation Results:
-Overall Accuracy: 80%
-Product Bug Accuracy: 75%
-Test Issue Accuracy: 85%
-Environment Issue Accuracy: 80%
-Avg Latency: 1.200 seconds
-```
+## 🧠 Design Decisions
 
-## ⚙️ System Behavior
+- **Hybrid (LLM + rules)**: LLM gives flexible reasoning on noisy logs, while rules provide deterministic correction for high-frequency signatures.
+- **JSON output contract**: strict machine-readable schema reduces downstream integration brittleness.
+- **Retry logic**: low-confidence outcomes trigger a stronger prompt + simplified input retry to improve robustness on noisy or long logs.
 
-- **Adaptive retry logic:** if confidence < 0.6, the agent retries with a stronger system prompt.
-- **Large-log handling:** if cleaned log length exceeds threshold, the log is summarized first.
-- **Memory assist:** results are persisted to `memory.json`; similar logs can reuse previous classifications.
-- **Observability:** runtime logs expose log length, summarization usage, retry trigger, final classification, and latency.
+## ⚠️ Limitations
 
-## ⏱ Performance
+- LLM behavior can still drift or hallucinate despite strict formatting constraints.
+- The included evaluation dataset is small and should be expanded for production confidence.
+- Rule-based keyword matching can introduce bias near category boundaries (e.g., timeout-related ambiguity).
 
-- Every output includes latency in seconds.
-- Evaluation reports average latency across dataset samples.
-- Batch mode prints overall average latency for processed logs.
-
-## Tradeoffs
+## Trade-offs
 
 - Similarity memory uses lightweight string similarity (fast, no extra infra) but can miss semantic matches.
-- Rule-based overrides improve precision for known patterns but may bias edge-case classifications.
 - Summarization improves long-log handling but can hide minor details in very noisy traces.
+- Prompt versioning increases control and experimentation options, but requires disciplined evaluation to avoid regressions.
