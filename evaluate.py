@@ -33,12 +33,12 @@ def main() -> None:
         log_text = log_path.read_text(encoding="utf-8")
         result = run_analysis(log_text)
         predictions.append(result)
-        ground_truth.append({"category": expected_category})
+        ground_truth.append({"category": expected_category, "log": log_text})
 
         print(
             f"- {filename}: predicted={result['category']} "
             f"expected={expected_category} confidence={result['confidence']:.2f} "
-            f"latency={result['latency']:.3f}s"
+            f"latency={result['latency']:.3f}s prompt={result['prompt_version']}"
         )
 
     metrics = evaluate(predictions, ground_truth)
@@ -53,12 +53,19 @@ def main() -> None:
     print("\nMisclassifications:")
     if metrics["misclassifications"]:
         for item in metrics["misclassifications"]:
-            print(
-                f"- Log {item['index']}: Expected {item['expected']} -> "
-                f"Predicted {item['predicted']}"
-            )
+            print(f"Log: {item['log']}")
+            print(f"Expected: {item['expected']}")
+            print(f"Predicted: {item['predicted']}")
+            print("Reason:")
+            print(f"- {item['reason']}")
+            print()
     else:
         print("- None")
+
+    if metrics["top_failure_patterns"]:
+        print("Top Failure Patterns:")
+        for pattern in metrics["top_failure_patterns"]:
+            print(f"- {pattern['pattern']} (count={pattern['count']})")
 
     if metrics["confusion"]:
         print("\nConfusion Totals:")

@@ -31,7 +31,7 @@ def test_run_batch_outputs_summary(monkeypatch, tmp_path: Path, capsys):
     (logs_dir / "a.txt").write_text("A", encoding="utf-8")
     (logs_dir / "b.txt").write_text("B", encoding="utf-8")
 
-    def fake_run_analysis(_: str) -> dict[str, object]:
+    def fake_run_analysis(_: str, prompt_version: str = "v1", debug: bool = False) -> dict[str, object]:
         return {
             "root_cause": "x",
             "category": "Test Issue",
