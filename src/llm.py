@@ -36,6 +36,7 @@ class Analyzer:
         self.prompt_version = prompt_version
         self.debug = debug
         self.deterministic = deterministic
+        self._provider = self._validate_provider()
         self.system_prompt = self._load_prompt(prompt_version)
 
     def _load_prompt(self, prompt_version: str) -> str:
@@ -61,13 +62,18 @@ class Analyzer:
         )
 
     @staticmethod
-    def _client() -> OpenAI:
+    def _validate_provider() -> str:
         provider = os.getenv("LLM_PROVIDER", DEFAULT_PROVIDER).strip().lower()
         if provider != "openai":
             raise RuntimeError(
                 f"Unsupported LLM_PROVIDER={provider!r}. This project currently supports OpenAI only. "
                 "Set LLM_PROVIDER=openai or extend Analyzer with another provider client."
             )
+        return provider
+
+    @staticmethod
+    def _client() -> OpenAI:
+        Analyzer._validate_provider()
 
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:

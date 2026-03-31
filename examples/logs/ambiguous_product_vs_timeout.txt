@@ -1,0 +1,3 @@
+2026-03-30 10:42:11 ERROR TimeoutError raised while parsing immediate API response
+2026-03-30 10:42:11 ERROR PaymentService parser entered invalid state after receiving malformed payload
+2026-03-30 10:42:11 ERROR stacktrace: ValueError: expected field 'amount' at index 0

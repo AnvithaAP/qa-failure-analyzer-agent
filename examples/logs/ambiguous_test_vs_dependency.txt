@@ -1,0 +1,4 @@
+pytest fixture bootstrap:
+AssertionError: fixture should monkeypatch module import for isolated test run
+helper text: "module not found" is expected before monkeypatch is applied
+actual failure: locator '#submit' not found after UI changed

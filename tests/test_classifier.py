@@ -37,3 +37,15 @@ def test_validate_output_accepts_and_defaults_latency():
     out = validate_output({"root_cause": "x", "category": "Test Issue", "confidence": 0.5, "suggestion": "y"})
     assert out["latency"] == 0.0
     assert out["confidence_reason"]
+
+
+def test_validate_output_clamps_confidence_and_latency():
+    out = validate_output(
+        {"root_cause": "x", "category": "Test Issue", "confidence": 42, "latency": -4, "suggestion": "y"}
+    )
+    assert out["confidence"] == 1.0
+    assert out["latency"] == 0.0
+
+
+def test_pip_keyword_rule_does_not_match_pipeline_word():
+    assert infer_category_from_rules("CI pipeline started successfully") is None
