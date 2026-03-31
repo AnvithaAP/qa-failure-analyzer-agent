@@ -5,7 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-MAX_LOG_CHARS = 1000
+MAX_LOG_CHARS = 20000
+MAX_INPUT_CHARS = 50000
 
 _TIMESTAMP_PATTERNS = (
     re.compile(r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:,\d+)?\s*"),
@@ -18,6 +19,50 @@ _NOISE_PATTERNS = (
 )
 
 _ERROR_SIGNAL = re.compile(r"(error|exception|failed|timeout|assert)", re.IGNORECASE)
+_INJECTION_PATTERNS = (
+    re.compile(r"ignore\s+previous\s+instructions", re.IGNORECASE),
+    re.compile(r"system\s*:\s*", re.IGNORECASE),
+    re.compile(r"assistant\s*:\s*", re.IGNORECASE),
+    re.compile(r"developer\s*:\s*", re.IGNORECASE),
+    re.compile(r"\<\/?(system|assistant|developer|tool)\>", re.IGNORECASE),
+)
+_SUSPICIOUS_PATTERNS = (
+    re.compile(r"rm\s+-rf\s+/", re.IGNORECASE),
+    re.compile(r"curl\s+.+\|\s*sh", re.IGNORECASE),
+    re.compile(r"powershell\s+-enc", re.IGNORECASE),
+)
+
+
+def sanitize_input(log: str, max_chars: int = MAX_INPUT_CHARS) -> tuple[str, dict[str, Any]]:
+    """Sanitize raw input logs for prompt safety and bounded processing."""
+    if not log:
+        return "", {"was_truncated": False, "removed_injection": 0, "removed_suspicious": 0}
+
+    lines: list[str] = []
+    removed_injection = 0
+    removed_suspicious = 0
+
+    for raw_line in log.splitlines():
+        line = raw_line.strip("\n")
+        if any(pattern.search(line) for pattern in _INJECTION_PATTERNS):
+            removed_injection += 1
+            continue
+        if any(pattern.search(line) for pattern in _SUSPICIOUS_PATTERNS):
+            removed_suspicious += 1
+            continue
+        lines.append(line)
+
+    sanitized = "\n".join(lines).strip()
+    was_truncated = len(sanitized) > max_chars
+    if was_truncated:
+        sanitized = sanitized[:max_chars]
+
+    metadata = {
+        "was_truncated": was_truncated,
+        "removed_injection": removed_injection,
+        "removed_suspicious": removed_suspicious,
+    }
+    return sanitized, metadata
 
 
 def clean_log(log: str) -> str:
@@ -83,10 +128,12 @@ def detect_error_events(log_text: str) -> list[str]:
 def assess_log_quality(log_text: str) -> dict[str, Any]:
     """Detect real-world log issues such as truncation and sparse context."""
     lowered = log_text.lower()
+    events = detect_error_events(log_text)
     return {
         "is_truncated": "truncated" in lowered or "...[truncated" in lowered,
         "is_partial": len(log_text.splitlines()) < 3,
-        "multi_error": len(detect_error_events(log_text)) > 1,
+        "multi_error": len(events) > 1,
+        "has_error_signal": bool(events),
     }
 
 
@@ -97,10 +144,8 @@ def split_ci_log_stream(payload: str) -> list[str]:
     if len(normalized) > 1:
         return normalized
 
-    # Fallback: split by blank-line paragraphs when separators are absent.
     paragraphs = [part.strip() for part in re.split(r"\n\s*\n", payload) if part.strip()]
     return paragraphs if len(paragraphs) > 1 else normalized
 
 
-# Backwards-compatible alias.
 clean_log_text = clean_log
