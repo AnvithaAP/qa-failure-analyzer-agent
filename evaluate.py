@@ -37,15 +37,28 @@ def main() -> None:
 
         print(
             f"- {filename}: predicted={result['category']} "
-            f"expected={expected_category} confidence={result['confidence']:.2f}"
+            f"expected={expected_category} confidence={result['confidence']:.2f} "
+            f"latency={result['latency']:.3f}s"
         )
 
     metrics = evaluate(predictions, ground_truth)
     print("\nEvaluation Results:")
-    print(f"Accuracy: {metrics['accuracy']:.0%}")
-    print(f"Correct: {metrics['correct']}/{metrics['total']}")
+    print(f"Overall Accuracy: {metrics['accuracy']:.0%}")
+    print(f"Product Bug Accuracy: {metrics['per_category_accuracy']['Product Bug']:.0%}")
+    print(f"Test Issue Accuracy: {metrics['per_category_accuracy']['Test Issue']:.0%}")
+    print(f"Environment Issue Accuracy: {metrics['per_category_accuracy']['Environment Issue']:.0%}")
     print(f"Avg Confidence: {metrics['avg_confidence']:.2f}")
-    print(f"Total Samples: {metrics['total']}")
+    print(f"Avg Latency: {metrics['avg_latency']:.3f} seconds")
+
+    print("\nMisclassifications:")
+    if metrics["misclassifications"]:
+        for item in metrics["misclassifications"]:
+            print(
+                f"- Log {item['index']}: Expected {item['expected']} -> "
+                f"Predicted {item['predicted']}"
+            )
+    else:
+        print("- None")
 
 
 if __name__ == "__main__":
