@@ -1,0 +1,3 @@
+10:05:44 INFO Opening checkout page
+10:05:45 ERROR NoSuchElementException: locator '#submit-order' not found
+10:05:45 ERROR UI appears to still be loading

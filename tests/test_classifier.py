@@ -1,4 +1,4 @@
-from src.classifier import postprocess_analysis
+from src.classifier import infer_category_from_rules, postprocess_analysis
 
 
 def test_postprocess_analysis_normalizes_values():
@@ -22,3 +22,9 @@ def test_postprocess_analysis_defaults_for_missing_fields():
     assert result["confidence"] == 0.5
     assert result["root_cause"]
     assert result["suggestion"]
+
+
+def test_infer_category_from_rules_handles_common_failures():
+    assert infer_category_from_rules("TimeoutError: API did not respond") == "Environment Issue"
+    assert infer_category_from_rules("AssertionError: expected 1 got 2") == "Test Issue"
+    assert infer_category_from_rules("HTTP 500 Internal Server Error") == "Product Bug"

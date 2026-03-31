@@ -1,0 +1,7 @@
+[
+  {"file": "examples/timeout_failure.txt", "category": "Environment Issue"},
+  {"file": "examples/assertion_failure.txt", "category": "Test Issue"},
+  {"file": "examples/locator_failure.txt", "category": "Test Issue"},
+  {"file": "examples/db_failure.txt", "category": "Environment Issue"},
+  {"file": "examples/product_bug_failure.txt", "category": "Product Bug"}
+]

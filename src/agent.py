@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from classifier import postprocess_analysis
+from classifier import apply_rule_override, postprocess_analysis
 from llm import analyze_log
 from utils import clean_log_text, truncate_log
 
@@ -17,14 +17,24 @@ logger = logging.getLogger("qa_failure_analyzer")
 
 
 def run_analysis(log_text: str) -> dict[str, Any]:
-    """Run the full pipeline: clean -> truncate -> LLM -> normalize."""
+    """Run the full pipeline: clean -> truncate -> LLM -> classify -> normalize."""
     if not log_text or not log_text.strip():
         raise ValueError("Log text is empty. Provide --log or --log-file with content.")
 
+    logger.info("[Step 1] Cleaning logs...")
     cleaned = clean_log_text(log_text)
+
+    logger.info("[Step 2] Truncating logs for model context...")
     prepared = truncate_log(cleaned)
+
+    logger.info("[Step 3] Sending logs to LLM...")
     raw_output = analyze_log(prepared)
-    return postprocess_analysis(raw_output)
+
+    logger.info("[Step 4] Applying deterministic classifier override...")
+    hybrid_output = apply_rule_override(raw_output, prepared)
+
+    logger.info("[Step 5] Normalizing final JSON payload...")
+    return postprocess_analysis(hybrid_output)
 
 
 def _parse_args() -> argparse.Namespace:

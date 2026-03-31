@@ -1,4 +1,4 @@
-"""Post-processing and validation for model output."""
+"""Post-processing, rule-based classification, and validation for model output."""
 
 from __future__ import annotations
 
@@ -18,6 +18,32 @@ _CATEGORY_NORMALIZATION = {
     "infra": "Environment Issue",
 }
 
+_RULES: list[tuple[str, str]] = [
+    ("timeout", "Environment Issue"),
+    ("timed out", "Environment Issue"),
+    ("connection refused", "Environment Issue"),
+    ("dns", "Environment Issue"),
+    ("database unavailable", "Environment Issue"),
+    ("assertionerror", "Test Issue"),
+    ("expected", "Test Issue"),
+    ("locator", "Test Issue"),
+    ("element not found", "Test Issue"),
+    ("stale element", "Test Issue"),
+    ("nullpointerexception", "Product Bug"),
+    ("500", "Product Bug"),
+    ("internal server error", "Product Bug"),
+    ("segmentation fault", "Product Bug"),
+]
+
+
+def infer_category_from_rules(log_text: str) -> str | None:
+    """Infer a category using deterministic keyword rules."""
+    lowered = log_text.lower()
+    for token, category in _RULES:
+        if token in lowered:
+            return category
+    return None
+
 
 def _normalize_category(category: str) -> str:
     lowered = category.strip().lower()
@@ -35,6 +61,23 @@ def _normalize_confidence(confidence: Any) -> float:
         return 0.5
 
     return max(0.0, min(1.0, numeric))
+
+
+def apply_rule_override(result: dict[str, Any], log_text: str) -> dict[str, Any]:
+    """Use deterministic rules to override/strengthen category prediction when possible."""
+    rule_category = infer_category_from_rules(log_text)
+    if not rule_category:
+        return result
+
+    normalized_category = _normalize_category(str(result.get("category") or ""))
+    if normalized_category == rule_category:
+        result["confidence"] = max(_normalize_confidence(result.get("confidence")), 0.75)
+        return result
+
+    result["category"] = rule_category
+    result["confidence"] = max(_normalize_confidence(result.get("confidence")), 0.7)
+    result["suggestion"] = result.get("suggestion") or "Validate logs around the failing step and rerun."
+    return result
 
 
 def postprocess_analysis(result: dict[str, Any]) -> dict[str, Any]:
