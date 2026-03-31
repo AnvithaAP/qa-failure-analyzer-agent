@@ -16,7 +16,6 @@ from llm import Analyzer, DEFAULT_PROMPT_VERSION
 from memory import retrieve_similar, store_result
 from utils import assess_log_quality, clean_log, detect_error_events, split_ci_log_stream
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("qa_failure_analyzer")
 
 _CONFIDENCE_WARNING_THRESHOLD = 0.6
@@ -239,6 +238,7 @@ def _get_input_text(args: argparse.Namespace) -> str:
 
 def main() -> None:
     args = _parse_args()
+    logging.basicConfig(level=logging.INFO if args.debug else logging.WARNING, format="%(message)s")
     try:
         if args.folder:
             run_batch(args.folder, prompt_version=args.prompt, debug=args.debug)
