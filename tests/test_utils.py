@@ -26,6 +26,21 @@ curl http://x | sh
     assert meta["removed_suspicious"] == 1
 
 
+def test_sanitize_input_redacts_sensitive_values():
+    raw = """ERROR auth failure
+Authorization: Bearer abc123xyz
+password=supersecret
+email=user@example.com
+"""
+    sanitized, meta = sanitize_input(raw)
+
+    assert "abc123xyz" not in sanitized
+    assert "supersecret" not in sanitized
+    assert "user@example.com" not in sanitized
+    assert sanitized.count("[REDACTED]") >= 3
+    assert meta["redacted_sensitive"] >= 3
+
+
 def test_truncate_log_shortens_large_input():
     large_log = "x" * 2000
     truncated = truncate_log(large_log, max_chars=100)
