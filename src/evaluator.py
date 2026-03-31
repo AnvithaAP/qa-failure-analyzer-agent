@@ -24,6 +24,7 @@ def evaluate(predictions: list[dict[str, Any]], ground_truth: list[dict[str, Any
             "per_category_accuracy": {category: 0.0 for category in CATEGORIES},
             "misclassifications": [],
             "confusion": {},
+            "confusion_matrix": {category: {inner: 0 for inner in CATEGORIES} for category in CATEGORIES},
         }
 
     correct = 0
@@ -34,11 +35,16 @@ def evaluate(predictions: list[dict[str, Any]], ground_truth: list[dict[str, Any
     }
     misclassifications: list[dict[str, Any]] = []
     confusion: dict[str, int] = defaultdict(int)
+    confusion_matrix: dict[str, dict[str, int]] = {
+        category: {inner: 0 for inner in CATEGORIES} for category in CATEGORIES
+    }
 
     for index, (prediction, truth) in enumerate(zip(predictions, ground_truth, strict=True), start=1):
         predicted_category = str(prediction.get("category", ""))
         expected_category = str(truth.get("category", ""))
         matched = predicted_category == expected_category
+        if expected_category in CATEGORIES and predicted_category in CATEGORIES:
+            confusion_matrix[expected_category][predicted_category] += 1
 
         if expected_category in counts:
             counts[expected_category]["total"] += 1
@@ -78,4 +84,5 @@ def evaluate(predictions: list[dict[str, Any]], ground_truth: list[dict[str, Any
         "per_category_accuracy": per_category_accuracy,
         "misclassifications": misclassifications,
         "confusion": dict(confusion),
+        "confusion_matrix": confusion_matrix,
     }
