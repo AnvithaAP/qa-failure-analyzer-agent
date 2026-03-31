@@ -176,6 +176,7 @@ def run_analysis(
             "Sanitized and cleaned input log.",
             removed_injection_lines=sanitize_meta["removed_injection"],
             removed_suspicious_lines=sanitize_meta["removed_suspicious"],
+            redacted_sensitive_tokens=sanitize_meta["redacted_sensitive"],
             input_truncated=sanitize_meta["was_truncated"],
         )
     )

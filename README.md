@@ -106,6 +106,7 @@ Implemented flow:
 Includes:
 
 - multi-line log support (stack traces and continuation lines)
+- sensitive-token redaction before LLM analysis (API keys, auth headers, emails, passwords)
 - multiple error detection in one log with severity prioritization
 - truncated/partial log handling with confidence penalties
 - confidence-based retry with stronger prompt behavior

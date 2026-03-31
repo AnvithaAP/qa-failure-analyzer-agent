@@ -31,16 +31,33 @@ _SUSPICIOUS_PATTERNS = (
     re.compile(r"curl\s+.+\|\s*sh", re.IGNORECASE),
     re.compile(r"powershell\s+-enc", re.IGNORECASE),
 )
+_SENSITIVE_PATTERNS = (
+    re.compile(r"(?i)\b(authorization|api[_-]?key|secret|token|password)\s*[:=]\s*([^\r\n]+)"),
+    re.compile(r"(?i)\bset-cookie\s*:\s*([^\r\n]+)"),
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+)
+_SENSITIVE_MASK = "[REDACTED]"
+
+
+def _redact_sensitive(line: str) -> tuple[str, int]:
+    redacted = line
+    replacements = 0
+    for pattern in _SENSITIVE_PATTERNS:
+        redacted, count = pattern.subn(_SENSITIVE_MASK, redacted)
+        replacements += count
+    return redacted, replacements
 
 
 def sanitize_input(log: str, max_chars: int = MAX_INPUT_CHARS) -> tuple[str, dict[str, Any]]:
     """Sanitize raw input logs for prompt safety and bounded processing."""
     if not log:
-        return "", {"was_truncated": False, "removed_injection": 0, "removed_suspicious": 0}
+        return "", {"was_truncated": False, "removed_injection": 0, "removed_suspicious": 0, "redacted_sensitive": 0}
 
     lines: list[str] = []
     removed_injection = 0
     removed_suspicious = 0
+    redacted_sensitive = 0
 
     for raw_line in log.splitlines():
         line = raw_line.strip("\n")
@@ -50,6 +67,8 @@ def sanitize_input(log: str, max_chars: int = MAX_INPUT_CHARS) -> tuple[str, dic
         if any(pattern.search(line) for pattern in _SUSPICIOUS_PATTERNS):
             removed_suspicious += 1
             continue
+        line, redactions = _redact_sensitive(line)
+        redacted_sensitive += redactions
         lines.append(line)
 
     sanitized = "\n".join(lines).strip()
@@ -61,6 +80,7 @@ def sanitize_input(log: str, max_chars: int = MAX_INPUT_CHARS) -> tuple[str, dic
         "was_truncated": was_truncated,
         "removed_injection": removed_injection,
         "removed_suspicious": removed_suspicious,
+        "redacted_sensitive": redacted_sensitive,
     }
     return sanitized, metadata
 
