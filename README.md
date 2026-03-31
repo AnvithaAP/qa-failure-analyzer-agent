@@ -1,47 +1,58 @@
 # QA Failure Analyzer Agent
 
-A production-like Python agent that transforms test logs into structured failure analysis:
+A production-like Python agent that transforms QA test logs into structured failure analysis with a reliable multi-step pipeline.
 
-- `root_cause` (string)
-- `category` (`Product Bug` | `Test Issue` | `Environment Issue`)
-- `confidence` (float between 0 and 1)
-- `suggestion` (string)
+## Structured Output
 
-## Architecture
+```json
+{
+  "root_cause": "...",
+  "category": "Product Bug | Test Issue | Environment Issue",
+  "confidence": 0.0,
+  "suggestion": "..."
+}
+```
 
-`Log -> Cleaning/Truncation -> LLM JSON -> Rule-based Classifier -> Post-processing -> Structured JSON`
+## Pipeline
+
+`clean_log -> analyze_log -> classify_failure -> validate_output -> output`
+
+Includes:
+- log cleaning + truncation
+- strict JSON parsing with retry
+- hybrid rule-based classification override
+- validation guardrails
+- caching and low-confidence warning
 
 ## Project Structure
 
-```
+```bash
 qa-failure-analyzer-agent/
 ├── src/
 │   ├── agent.py
 │   ├── llm.py
 │   ├── classifier.py
-│   └── utils.py
+│   ├── utils.py
+│   └── evaluator.py
 ├── examples/
-│   ├── timeout_failure.txt
-│   ├── assertion_failure.txt
-│   ├── locator_failure.txt
-│   ├── db_failure.txt
-│   ├── product_bug_failure.txt
-│   └── eval_dataset.json
+│   └── logs/
+│       ├── timeout.txt
+│       ├── assertion.txt
+│       ├── locator.txt
+│       ├── api_error.txt
+│       └── db_failure.txt
 ├── tests/
-├── evaluate.py
 ├── requirements.txt
-└── README.md
+└── evaluate.py
 ```
 
 ## Setup
-
-1. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Configure environment variables (e.g., `.env`):
+Set environment variables:
 
 ```env
 OPENAI_API_KEY=your_api_key_here
@@ -50,58 +61,23 @@ OPENAI_MODEL=gpt-4o-mini
 
 ## CLI Usage
 
-Analyze inline logs:
-
 ```bash
 python src/agent.py --log "TimeoutError: API did not respond"
-```
-
-Analyze logs from file:
-
-```bash
-python src/agent.py --log-file examples/timeout_failure.txt
-```
-
-## Example Output
-
-```json
-{
-  "root_cause": "API backend did not return within the expected timeout window.",
-  "category": "Environment Issue",
-  "confidence": 0.84,
-  "suggestion": "Validate API health and increase timeout only after investigating backend latency."
-}
+python src/agent.py --file examples/logs/timeout.txt
 ```
 
 ## Evaluation
-
-Run deterministic classification evaluation on labeled examples:
 
 ```bash
 python evaluate.py
 ```
 
-Example metrics:
+Sample output:
 
 ```bash
-classification_correct: 5/5
-accuracy: 100%
+Evaluation Results:
+Accuracy: 80%
+Correct: 4/5
+Avg Confidence: 0.79
+Total Samples: 5
 ```
-
-## Agent Behaviors
-
-The CLI provides transparent pipeline logging:
-
-```bash
-[Step 1] Cleaning logs...
-[Step 2] Truncating logs for model context...
-[Step 3] Sending logs to LLM...
-[Step 4] Applying deterministic classifier override...
-[Step 5] Normalizing final JSON payload...
-```
-
-## Notes
-
-- Enforces structured output via OpenAI JSON mode and post-processing.
-- Uses deterministic inference settings (`temperature=0`) for stable outputs.
-- Includes hybrid LLM + rule-based classification behavior for reliability.
