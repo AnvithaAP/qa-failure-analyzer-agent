@@ -9,7 +9,7 @@ A production-like Python agent that transforms test logs into structured failure
 
 ## Architecture
 
-`Log -> Cleaning/Truncation -> LLM -> Post-processing -> Structured JSON`
+`Log -> Cleaning/Truncation -> LLM JSON -> Rule-based Classifier -> Post-processing -> Structured JSON`
 
 ## Project Structure
 
@@ -21,8 +21,14 @@ qa-failure-analyzer-agent/
 │   ├── classifier.py
 │   └── utils.py
 ├── examples/
-│   └── sample_logs.txt
+│   ├── timeout_failure.txt
+│   ├── assertion_failure.txt
+│   ├── locator_failure.txt
+│   ├── db_failure.txt
+│   ├── product_bug_failure.txt
+│   └── eval_dataset.json
 ├── tests/
+├── evaluate.py
 ├── requirements.txt
 └── README.md
 ```
@@ -53,7 +59,7 @@ python src/agent.py --log "TimeoutError: API did not respond"
 Analyze logs from file:
 
 ```bash
-python src/agent.py --log-file examples/sample_logs.txt
+python src/agent.py --log-file examples/timeout_failure.txt
 ```
 
 ## Example Output
@@ -67,30 +73,35 @@ python src/agent.py --log-file examples/sample_logs.txt
 }
 ```
 
-## Prompt Design
+## Evaluation
 
-System prompt used by the LLM module:
+Run deterministic classification evaluation on labeled examples:
 
-> You are a senior QA engineer analyzing test failures.
-> Given logs, identify the root cause, classify the failure,
-> and suggest actionable fixes.
+```bash
+python evaluate.py
+```
 
-User prompt shape:
+Example metrics:
 
-```text
-LOG:
-<log_text>
+```bash
+classification_correct: 5/5
+accuracy: 100%
+```
 
-Return JSON:
-{
-"root_cause": "...",
-"category": "...",
-"confidence": 0.0,
-"suggestion": "..."
-}
+## Agent Behaviors
+
+The CLI provides transparent pipeline logging:
+
+```bash
+[Step 1] Cleaning logs...
+[Step 2] Truncating logs for model context...
+[Step 3] Sending logs to LLM...
+[Step 4] Applying deterministic classifier override...
+[Step 5] Normalizing final JSON payload...
 ```
 
 ## Notes
 
-- Includes error handling for empty input, missing API key, invalid JSON responses, and malformed categories.
+- Enforces structured output via OpenAI JSON mode and post-processing.
 - Uses deterministic inference settings (`temperature=0`) for stable outputs.
+- Includes hybrid LLM + rule-based classification behavior for reliability.
